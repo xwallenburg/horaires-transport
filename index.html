@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Prochains départs – Crissier Arc-en-Ciel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Bibliothèques -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.16.0/moment.min.js"></script>
+
+  <style>
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      h1 { margin-bottom: 10px; }
+      table { border-collapse: collapse; width: 100%; max-width: 500px; }
+      td, th { padding: 8px; border-bottom: 1px solid #ddd; text-align: center; }
+      .delay { color: red; }
+  </style>
+</head>
+
+<body>
+
+<h1 style="font-size: 18px;">Crissier – Arc-en-Ciel</h1>
+<!-- <p>Prochains départs :</p> -->
+
+<table>
+  <thead>
+    <tr>
+      <th>Ligne</th>
+      <th>Destination</th>
+      <th>Heure</th>
+      <th>Dans</th>
+      <th>Retard</th>
+    </tr>
+  </thead>
+  <tbody id="timetable"></tbody>
+</table>
+
+<script>
+function loadDepartures() {
+  // Ajouter un timestamp pour contourner le cache serveur
+  $.getJSON("https://api3.geo.admin.ch/stationboard/stops/8591935?_=" + Date.now(), function(data) {
+      let rows = "";
+
+      data.forEach(function(entry) {
+          let now = moment(entry.currentDate);
+          let scheduled = moment(entry.departureDate);
+          let estimated = entry.estimatedDate !== "nodata" ? moment(entry.estimatedDate) : null;
+
+          let finalTime = estimated || scheduled;
+
+          // Ligne
+          let label = entry.label || "-";
+          if (label.length > 3) label = label.substring(0,3);
+
+          // Heure de départ
+          let time = finalTime.format("HH:mm");
+
+          // Différence ("dans X minutes")
+          let diffMinutes = Math.floor(finalTime.diff(now, "minutes")) + "′";
+
+          // Retard éventuel
+          let delay = "";
+          if (estimated) {
+              let lateMin = estimated.diff(scheduled, "minutes");
+              if (lateMin > 0) delay = "(+" + lateMin + "′)";
+          }
+
+          rows += `
+            <tr>
+              <td>${label}</td>
+              <td>${entry.destinationName}</td>
+              <td>${time}</td>
+              <td>${diffMinutes}</td>
+              <td class="delay">${delay}</td>
+            </tr>
+          `;
+      });
+
+      $("#timetable").html(rows);
+  })
+  .fail(function() {
+      $("#timetable").html(
+        `<tr><td colspan="5">Pas de données disponibles.</td></tr>`
+      );
+  });
+}
+
+// Premier chargement + actualisation toutes les 60 secondes
+loadDepartures();
+setInterval(loadDepartures, 60000);
+</script>
+
+</body>
+</html>
+
