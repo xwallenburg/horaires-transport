@@ -27,7 +27,7 @@
       .delay { 
           color: red; 
       }
-      /* TL-style line icons */
+      /* TL-style circular line icons */
       .line-icon {
           display: inline-block;
           width: 32px;
@@ -64,7 +64,7 @@ const STOPS = [
   { name: "Zinguerie",  id: "8591460" }
 ];
 
-// Line colors (TL-style)
+// Line colors (TL style)
 const LINE_COLORS = {
   "17": "#ffcc00",
   "36": "#66b2ff",
@@ -84,7 +84,7 @@ function loadDepartures() {
     Promise.all(requests).then(results => {
         results.forEach(({ stop, data }) => {
 
-            // Group header for each stop
+            // Group header
             allRows += `
               <tr style="background:#eee;">
                 <td colspan="5" style="text-align:left;padding:6px;font-weight:bold;">
@@ -106,28 +106,23 @@ function loadDepartures() {
                 let allowed = false;
 
                 if (stop.name === "Arc-en-Ciel") {
-                    // Only 17 → Lausanne, Vigie
                     allowed =
                         line === "17" &&
                         dest.includes("lausanne, vigie");
                 }
 
                 if (stop.name === "Zinguerie") {
-                    // 36, 54, 58 → Renens
-                    const renensTargets = [
-                      "renens, gare",
-                      "renens gare",
-                      "renens gare nord",
-                      "renens, gare nord"
-                    ];
+                    // NEW rule: any destination containing “renens”
+                    const goingToRenens = dest.includes("renens");
+
                     allowed =
                         ["36", "54", "58"].includes(line) &&
-                        renensTargets.some(t => dest.includes(t));
+                        goingToRenens;
                 }
 
                 if (!allowed) return;
 
-                // TIME CALCULATION
+                // TIME HANDLING
                 let now = moment(entry.currentDate);
                 let scheduled = moment(entry.departureDate);
                 let estimated = entry.estimatedDate !== "nodata" ? moment(entry.estimatedDate) : null;
@@ -136,7 +131,6 @@ function loadDepartures() {
                 let time = finalTime.format("HH:mm");
                 let diffMinutes = Math.floor(finalTime.diff(now, "minutes")) + "′";
 
-                // Delay
                 let delay = "";
                 if (estimated) {
                     let lateMin = estimated.diff(scheduled, "minutes");
@@ -146,7 +140,7 @@ function loadDepartures() {
                 // Line color
                 const color = LINE_COLORS[line] || "#555";
 
-                // Build row
+                // Row output
                 allRows += `
                     <tr>
                         <td>
@@ -167,7 +161,7 @@ function loadDepartures() {
     });
 }
 
-// Initial load and auto-refresh
+// Load and auto-refresh every 60s
 loadDepartures();
 setInterval(loadDepartures, 60000);
 </script>
