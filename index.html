@@ -2,26 +2,48 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Prochains départs – Crissier Arc-en-Ciel</title>
+  <title>Prochains départs</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Bibliothèques -->
+  <!-- Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.16.0/moment.min.js"></script>
 
   <style>
-      body { font-family: Arial, sans-serif; margin: 20px; }
-      h1 { margin-bottom: 10px; }
-      table { border-collapse: collapse; width: 100%; max-width: 500px; }
-      td, th { padding: 8px; border-bottom: 1px solid #ddd; text-align: center; }
-      .delay { color: red; }
+      body { 
+          font-family: Arial, sans-serif; 
+          margin: 20px; 
+      }
+      table { 
+          border-collapse: collapse; 
+          width: 100%; 
+          max-width: 600px; 
+      }
+      td, th { 
+          padding: 8px; 
+          border-bottom: 1px solid #ddd; 
+          text-align: center; 
+      }
+      .delay { 
+          color: red; 
+      }
+      /* TL-style line icons */
+      .line-icon {
+          display: inline-block;
+          width: 32px;
+          height: 32px;
+          line-height: 32px;
+          border-radius: 50%;
+          color: #fff;
+          font-weight: bold;
+          text-align: center;
+          margin: auto;
+          font-size: 16px;
+      }
   </style>
 </head>
 
 <body>
-
-<!-- <h1 style="font-size: 18px;">Crissier – Arc-en-Ciel</h1> -->
-<!-- <p>Prochains départs :</p> -->
 
 <table>
   <thead>
@@ -37,85 +59,118 @@
 </table>
 
 <script>
+const STOPS = [
+  { name: "Arc-en-Ciel", id: "8591935" },
+  { name: "Zinguerie",  id: "8591460" }
+];
+
+// Line colors (TL-style)
+const LINE_COLORS = {
+  "17": "#ffcc00",
+  "36": "#66b2ff",
+  "54": "#77dd77",
+  "58": "#ff8888"
+};
+
 function loadDepartures() {
-  $.getJSON("https://api3.geo.admin.ch/stationboard/stops/8591935?_=" + Date.now(), function(data) {
-      let rows = "";
+    let allRows = "";
 
-      data.forEach(function(entry) {
+    let requests = STOPS.map(stop =>
+      $.getJSON("https://api3.geo.admin.ch/stationboard/stops/" + stop.id + "?_=" + Date.now())
+        .then(data => ({ stop, data }))
+        .catch(() => ({ stop, data: null }))
+    );
 
-          // --- NORMALIZE DATA ---
-          const line = entry.label;
-          const dest = entry.destinationName.toLowerCase();
+    Promise.all(requests).then(results => {
+        results.forEach(({ stop, data }) => {
 
-          // --- FILTER RULES ---
+            // Group header for each stop
+            allRows += `
+              <tr style="background:#eee;">
+                <td colspan="5" style="text-align:left;padding:6px;font-weight:bold;">
+                  ${stop.name}
+                </td>
+              </tr>
+            `;
 
-          // 1️⃣ Line 17 going to Lausanne, Vigie
-          const is17Vigie =
-              line.startsWith("17") &&
-              dest.includes("lausanne, vigie");
+            if (!data) {
+                allRows += `<tr><td colspan="5">Pas de données.</td></tr>`;
+                return;
+            }
 
-          // 2️⃣ Lines 36, 54, 58 going to Renens
-          const renensTargets = [
-            "renens, gare",
-            "renens gare",
-            "renens gare nord",
-            "renens, gare nord"
-          ];
+            data.forEach(entry => {
+                const line = entry.label.substring(0,2);
+                const dest = entry.destinationName.toLowerCase();
 
-          const isRenens =
-              ["36", "54", "58"].includes(line.substring(0,2)) &&
-              renensTargets.some(t => dest.includes(t));
+                // --- FILTERS PER STOP ---
+                let allowed = false;
 
-          // If NOT matching any rule → skip
-          if (!is17Vigie && !isRenens) return;
+                if (stop.name === "Arc-en-Ciel") {
+                    // Only 17 → Lausanne, Vigie
+                    allowed =
+                        line === "17" &&
+                        dest.includes("lausanne, vigie");
+                }
 
+                if (stop.name === "Zinguerie") {
+                    // 36, 54, 58 → Renens
+                    const renensTargets = [
+                      "renens, gare",
+                      "renens gare",
+                      "renens gare nord",
+                      "renens, gare nord"
+                    ];
+                    allowed =
+                        ["36", "54", "58"].includes(line) &&
+                        renensTargets.some(t => dest.includes(t));
+                }
 
-          // --- STANDARD RENDERING ---
-          let now = moment(entry.currentDate);
-          let scheduled = moment(entry.departureDate);
-          let estimated = entry.estimatedDate !== "nodata" ? moment(entry.estimatedDate) : null;
-          let finalTime = estimated || scheduled;
+                if (!allowed) return;
 
-          let label = line || "-";
-          if (label.length > 3) label = label.substring(0,3);
+                // TIME CALCULATION
+                let now = moment(entry.currentDate);
+                let scheduled = moment(entry.departureDate);
+                let estimated = entry.estimatedDate !== "nodata" ? moment(entry.estimatedDate) : null;
+                let finalTime = estimated || scheduled;
 
-          let time = finalTime.format("HH:mm");
-          let diffMinutes = Math.floor(finalTime.diff(now, "minutes")) + "′";
+                let time = finalTime.format("HH:mm");
+                let diffMinutes = Math.floor(finalTime.diff(now, "minutes")) + "′";
 
-          let delay = "";
-          if (estimated) {
-              let lateMin = estimated.diff(scheduled, "minutes");
-              if (lateMin > 0) delay = "(+" + lateMin + "′)";
-          }
+                // Delay
+                let delay = "";
+                if (estimated) {
+                    let lateMin = estimated.diff(scheduled, "minutes");
+                    if (lateMin > 0) delay = "(+" + lateMin + "′)";
+                }
 
-          rows += `
-            <tr>
-              <td>${label}</td>
-              <td>${entry.destinationName}</td>
-              <td>${time}</td>
-              <td>${diffMinutes}</td>
-              <td class="delay">${delay}</td>
-            </tr>
-          `;
-      });
+                // Line color
+                const color = LINE_COLORS[line] || "#555";
 
-      $("#timetable").html(
-        rows || `<tr><td colspan="5">Aucun départ correspondant.</td></tr>`
-      );
-  })
-  .fail(function() {
-      $("#timetable").html(
-        `<tr><td colspan="5">Pas de données disponibles.</td></tr>`
-      );
-  });
+                // Build row
+                allRows += `
+                    <tr>
+                        <td>
+                            <div class="line-icon" style="background:${color};">
+                                ${line}
+                            </div>
+                        </td>
+                        <td>${entry.destinationName}</td>
+                        <td>${time}</td>
+                        <td>${diffMinutes}</td>
+                        <td class="delay">${delay}</td>
+                    </tr>
+                `;
+            });
+        });
+
+        $("#timetable").html(allRows);
+    });
 }
 
+// Initial load and auto-refresh
 loadDepartures();
 setInterval(loadDepartures, 60000);
 </script>
 
-
-
 </body>
 </html>
-
