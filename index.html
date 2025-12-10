@@ -2,49 +2,42 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Prochains départs</title>
+  <title>Départs – Arc-en-Ciel & Zinguerie</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.16.0/moment.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
 
   <style>
-      body { 
-          font-family: Arial, sans-serif; 
-          margin: 20px; 
-      }
-      table { 
-          border-collapse: collapse; 
-          width: 100%; 
-          max-width: 600px; 
-      }
-      td, th { 
-          padding: 8px; 
-          border-bottom: 1px solid #ddd; 
-          text-align: center; 
-      }
-      .delay { 
-          color: red; 
-      }
-      /* TL-style circular line icons */
-      .line-icon {
+      body { font-family: Arial, sans-serif; margin: 20px; }
+
+      h2 { margin-top: 40px; }
+
+      table { border-collapse: collapse; width: 100%; max-width: 600px; margin-bottom: 40px; }
+      td, th { padding: 8px; border-bottom: 1px solid #ddd; text-align: center; }
+
+      .delay { color: red; }
+
+      /* TL-style line badge */
+      .line-badge {
           display: inline-block;
-          width: 32px;
-          height: 32px;
-          line-height: 32px;
-          border-radius: 50%;
-          color: #fff;
+          padding: 4px 10px;
+          border-radius: 20px;
+          color: white;
           font-weight: bold;
-          text-align: center;
-          margin: auto;
-          font-size: 16px;
       }
+
+      /* COLORS PER LINE */
+      .L17 { background: #0082CA; }
+      .L36 { background: #00A859; }
+      .L54 { background: #E86E0A; }
+      .L58 { background: #C2185B; }
   </style>
 </head>
 
 <body>
 
+<h2>Arc-en-Ciel – Ligne 17 → Lausanne, Vigie</h2>
 <table>
   <thead>
     <tr>
@@ -55,115 +48,99 @@
       <th>Retard</th>
     </tr>
   </thead>
-  <tbody id="timetable"></tbody>
+  <tbody id="ace"></tbody>
 </table>
 
+<h2>Zinguerie → Renens</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Ligne</th>
+      <th>Destination</th>
+      <th>Heure</th>
+      <th>Dans</th>
+      <th>Retard</th>
+    </tr>
+  </thead>
+  <tbody id="zing"></tbody>
+</table>
+
+
 <script>
-const STOPS = [
-  { name: "Arc-en-Ciel", id: "8591935" },
-  { name: "Zinguerie",  id: "8591460" }
-];
 
-// Line colors (TL style)
-const LINE_COLORS = {
-  "17": "#ffcc00",
-  "36": "#66b2ff",
-  "54": "#77dd77",
-  "58": "#ff8888"
-};
-
-function loadDepartures() {
-    let allRows = "";
-
-    let requests = STOPS.map(stop =>
-      $.getJSON("https://api3.geo.admin.ch/stationboard/stops/" + stop.id + "?_=" + Date.now())
-        .then(data => ({ stop, data }))
-        .catch(() => ({ stop, data: null }))
-    );
-
-    Promise.all(requests).then(results => {
-        results.forEach(({ stop, data }) => {
-
-            // Group header
-            allRows += `
-              <tr style="background:#eee;">
-                <td colspan="5" style="text-align:left;padding:6px;font-weight:bold;">
-                  ${stop.name}
-                </td>
-              </tr>
-            `;
-
-            if (!data) {
-                allRows += `<tr><td colspan="5">Pas de données.</td></tr>`;
-                return;
-            }
-
-            data.forEach(entry => {
-                const line = entry.label.substring(0,2);
-                const dest = entry.destinationName.toLowerCase();
-
-                // --- FILTERS PER STOP ---
-                let allowed = false;
-
-                if (stop.name === "Arc-en-Ciel") {
-                    allowed =
-                        line === "17" &&
-                        dest.includes("lausanne, vigie");
-                }
-
-                if (stop.name === "Zinguerie") {
-                    // NEW rule: any destination containing “renens”
-                    const goingToRenens = dest.includes("renens");
-
-                    allowed =
-                        ["36", "54", "58"].includes(line) &&
-                        goingToRenens;
-                }
-
-                if (!allowed) return;
-
-                // TIME HANDLING
-                let now = moment(entry.currentDate);
-                let scheduled = moment(entry.departureDate);
-                let estimated = entry.estimatedDate !== "nodata" ? moment(entry.estimatedDate) : null;
-                let finalTime = estimated || scheduled;
-
-                let time = finalTime.format("HH:mm");
-                let diffMinutes = Math.floor(finalTime.diff(now, "minutes")) + "′";
-
-                let delay = "";
-                if (estimated) {
-                    let lateMin = estimated.diff(scheduled, "minutes");
-                    if (lateMin > 0) delay = "(+" + lateMin + "′)";
-                }
-
-                // Line color
-                const color = LINE_COLORS[line] || "#555";
-
-                // Row output
-                allRows += `
-                    <tr>
-                        <td>
-                            <div class="line-icon" style="background:${color};">
-                                ${line}
-                            </div>
-                        </td>
-                        <td>${entry.destinationName}</td>
-                        <td>${time}</td>
-                        <td>${diffMinutes}</td>
-                        <td class="delay">${delay}</td>
-                    </tr>
-                `;
-            });
-        });
-
-        $("#timetable").html(allRows);
-    });
+function fetchStop(stopId, callback) {
+    $.getJSON("https://api3.geo.admin.ch/stationboard/stops/" + stopId + "?_=" + Date.now(), callback)
+    .fail(() => callback(null));
 }
 
-// Load and auto-refresh every 60s
-loadDepartures();
-setInterval(loadDepartures, 60000);
+function formatEntry(entry) {
+    let now = moment(entry.currentDate);
+    let scheduled = moment(entry.departureDate);
+    let estimated = entry.estimatedDate !== "nodata" ? moment(entry.estimatedDate) : null;
+    let finalTime = estimated || scheduled;
+
+    let diff = Math.floor(finalTime.diff(now, "minutes")) + "′";
+
+    let delay = "";
+    if (estimated) {
+        let late = estimated.diff(scheduled, "minutes");
+        if (late > 0) delay = "(+" + late + "′)";
+    }
+
+    let line = entry.label;
+    if (!line) return null;
+    if (line.length > 3) line = line.substring(0,3);
+
+    return `
+        <tr>
+            <td><span class="line-badge L${line}">${line}</span></td>
+            <td>${entry.destinationName}</td>
+            <td>${finalTime.format("HH:mm")}</td>
+            <td>${diff}</td>
+            <td class="delay">${delay}</td>
+        </tr>
+    `;
+}
+
+function loadAll() {
+
+    /* ---------------- ARC-EN-CIEL (17 only) ---------------- */
+    fetchStop(8591935, function(data) {
+        if (!data) { $("#ace").html("<tr><td colspan='5'>Erreur</td></tr>"); return; }
+
+        let rows = "";
+        data.forEach(e => {
+            if (e.label !== "17") return;                // Only line 17
+            rows += formatEntry(e);
+        });
+
+        if (rows === "") rows = "<tr><td colspan='5'>Aucun départ</td></tr>";
+        $("#ace").html(rows);
+    });
+
+
+    /* ---------------- ZINGUERIE (36 / 54 / 58 → Renens*) ---------------- */
+    fetchStop(8591460, function(data) {
+        if (!data) { $("#zing").html("<tr><td colspan='5'>Erreur</td></tr>"); return; }
+
+        let rows = "";
+        data.forEach(e => {
+            if (!["36","54","58"].includes(e.label)) return;      // Only these lines
+            if (!e.destinationName.toLowerCase().includes("renens")) return;  // Must contain Renens
+
+            rows += formatEntry(e);
+        });
+
+        if (rows === "") rows = "<tr><td colspan='5'>Aucun départ</td></tr>";
+        $("#zing").html(rows);
+    });
+
+}
+
+// Initial load + refresh every 60s
+loadAll();
+setInterval(loadAll, 60000);
+
 </script>
 
 </body>
