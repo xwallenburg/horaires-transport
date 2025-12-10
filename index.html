@@ -43,28 +43,45 @@ function loadDepartures() {
 
       data.forEach(function(entry) {
 
-          // 🔥 FILTER: only keep line 17 to Lausanne, Vigie
-          if (!(entry.label.startsWith("17") && entry.destinationName.includes("Lausanne, Vigie"))) {
-              return; // skip this entry
-          }
+          // --- NORMALIZE DATA ---
+          const line = entry.label;
+          const dest = entry.destinationName.toLowerCase();
 
+          // --- FILTER RULES ---
+
+          // 1️⃣ Line 17 going to Lausanne, Vigie
+          const is17Vigie =
+              line.startsWith("17") &&
+              dest.includes("lausanne, vigie");
+
+          // 2️⃣ Lines 36, 54, 58 going to Renens
+          const renensTargets = [
+            "renens, gare",
+            "renens gare",
+            "renens gare nord",
+            "renens, gare nord"
+          ];
+
+          const isRenens =
+              ["36", "54", "58"].includes(line.substring(0,2)) &&
+              renensTargets.some(t => dest.includes(t));
+
+          // If NOT matching any rule → skip
+          if (!is17Vigie && !isRenens) return;
+
+
+          // --- STANDARD RENDERING ---
           let now = moment(entry.currentDate);
           let scheduled = moment(entry.departureDate);
           let estimated = entry.estimatedDate !== "nodata" ? moment(entry.estimatedDate) : null;
-
           let finalTime = estimated || scheduled;
 
-          // Ligne
-          let label = entry.label || "-";
+          let label = line || "-";
           if (label.length > 3) label = label.substring(0,3);
 
-          // Heure de départ
           let time = finalTime.format("HH:mm");
-
-          // Différence ("dans X minutes")
           let diffMinutes = Math.floor(finalTime.diff(now, "minutes")) + "′";
 
-          // Retard éventuel
           let delay = "";
           if (estimated) {
               let lateMin = estimated.diff(scheduled, "minutes");
@@ -82,7 +99,9 @@ function loadDepartures() {
           `;
       });
 
-      $("#timetable").html(rows || `<tr><td colspan="5">Aucun départ pour Lausanne, Vigie</td></tr>`);
+      $("#timetable").html(
+        rows || `<tr><td colspan="5">Aucun départ correspondant.</td></tr>`
+      );
   })
   .fail(function() {
       $("#timetable").html(
@@ -94,6 +113,7 @@ function loadDepartures() {
 loadDepartures();
 setInterval(loadDepartures, 60000);
 </script>
+
 
 
 </body>
