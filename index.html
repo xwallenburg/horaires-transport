@@ -38,11 +38,16 @@
 
 <script>
 function loadDepartures() {
-  // Ajouter un timestamp pour contourner le cache serveur
   $.getJSON("https://api3.geo.admin.ch/stationboard/stops/8591935?_=" + Date.now(), function(data) {
       let rows = "";
 
       data.forEach(function(entry) {
+
+          // 🔥 FILTER: only keep line 17 to Lausanne, Vigie
+          if (!(entry.label.startsWith("17") && entry.destinationName.includes("Lausanne, Vigie"))) {
+              return; // skip this entry
+          }
+
           let now = moment(entry.currentDate);
           let scheduled = moment(entry.departureDate);
           let estimated = entry.estimatedDate !== "nodata" ? moment(entry.estimatedDate) : null;
@@ -77,7 +82,7 @@ function loadDepartures() {
           `;
       });
 
-      $("#timetable").html(rows);
+      $("#timetable").html(rows || `<tr><td colspan="5">Aucun départ pour Lausanne, Vigie</td></tr>`);
   })
   .fail(function() {
       $("#timetable").html(
@@ -86,10 +91,10 @@ function loadDepartures() {
   });
 }
 
-// Premier chargement + actualisation toutes les 60 secondes
 loadDepartures();
 setInterval(loadDepartures, 60000);
 </script>
+
 
 </body>
 </html>
