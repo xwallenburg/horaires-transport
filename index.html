@@ -51,7 +51,7 @@
   <tbody id="ace"></tbody>
 </table>
 
-<h2>Zinguerie → Renens</h2>
+<h2>Zinguerie – Toutes les lignes</h2>
 <table>
   <thead>
     <tr>
@@ -87,8 +87,7 @@ function formatEntry(entry) {
         if (late > 0) delay = "(+" + late + "′)";
     }
 
-    let line = entry.label;
-    if (!line) return null;
+    let line = entry.label || "";
     if (line.length > 3) line = line.substring(0,3);
 
     return `
@@ -119,16 +118,13 @@ function loadAll() {
     });
 
 
-    /* ---------------- ZINGUERIE (36 / 54 / 58 → Renens*) ---------------- */
+    /* ---------------- ZINGUERIE (PERMISSIVE) ---------------- */
     fetchStop(8591460, function(data) {
         if (!data) { $("#zing").html("<tr><td colspan='5'>Erreur</td></tr>"); return; }
 
         let rows = "";
         data.forEach(e => {
-            if (!["36","54","58"].includes(e.label)) return;      // Only these lines
-            if (!e.destinationName.toLowerCase().includes("renens")) return;  // Must contain Renens
-
-            rows += formatEntry(e);
+            rows += formatEntry(e); // No filter at all
         });
 
         if (rows === "") rows = "<tr><td colspan='5'>Aucun départ</td></tr>";
