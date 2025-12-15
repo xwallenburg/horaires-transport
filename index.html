@@ -11,30 +11,38 @@
   <style>
       body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
 
-      /* Stop headers same size as table headers */
       .stop-header {
-          font-size: 12px; /* reduced */
+          font-size: 12px;
           font-weight: bold;
           margin-top: 40px;
           margin-bottom: 5px;
       }
 
-      table { border-collapse: collapse; width: 100%; max-width: 600px; margin-bottom: 40px; }
-      td, th { padding: 8px; border-bottom: 1px solid #ddd; text-align: center; font-size: 12px; }
+      table {
+          border-collapse: collapse;
+          width: 100%;
+          max-width: 600px;
+          margin-bottom: 40px;
+      }
+
+      td, th {
+          padding: 8px;
+          border-bottom: 1px solid #ddd;
+          text-align: center;
+          font-size: 12px;
+      }
 
       .delay { color: red; }
 
-      /* TL-style line badge */
       .line-badge {
           display: inline-block;
           padding: 4px 10px;
           border-radius: 20px;
           color: white;
           font-weight: bold;
-          font-size: 12px; /* match table */
+          font-size: 12px;
       }
 
-      /* COLORS PER LINE */
       .L17 { background: #0082CA; }
       .L36 { background: #00A859; }
       .L54 { background: #E86E0A; }
@@ -72,30 +80,29 @@
   <tbody id="zing"></tbody>
 </table>
 
-
 <script>
 
 function fetchStop(stopId, callback) {
-    $.getJSON("https://api3.geo.admin.ch/stationboard/stops/" + stopId + "?_=" + Date.now(), callback)
-    .fail(() => callback(null));
+    $.getJSON(
+        "https://api3.geo.admin.ch/stationboard/stops/" + stopId + "?_=" + Date.now(),
+        callback
+    ).fail(() => callback(null));
 }
 
 function formatEntry(entry) {
-    let now = moment(entry.currentDate);
-    let scheduled = moment(entry.departureDate);
-    let estimated = entry.estimatedDate !== "nodata" ? moment(entry.estimatedDate) : null;
-    let finalTime = estimated || scheduled;
-
-    let diff = Math.floor(finalTime.diff(now, "minutes")) + "′";
+    const now = moment(entry.currentDate);
+    const scheduled = moment(entry.departureDate);
+    const estimated = entry.estimatedDate !== "nodata" ? moment(entry.estimatedDate) : null;
+    const finalTime = estimated || scheduled;
 
     let delay = "";
     if (estimated) {
-        let late = estimated.diff(scheduled, "minutes");
+        const late = estimated.diff(scheduled, "minutes");
         if (late > 0) delay = "(+" + late + "′)";
     }
 
-    let line = entry.label || "";
-    if (line.length > 3) line = line.substring(0,3);
+    const line = (entry.label || "").trim();
+    const diff = Math.floor(finalTime.diff(now, "minutes")) + "′";
 
     return `
         <tr>
@@ -110,40 +117,41 @@ function formatEntry(entry) {
 
 function loadAll() {
 
-    /* ---------------- ARC-EN-CIEL (17 → Lausanne, Vigie) ---------------- */
-    fetchStop(8591935, function(data) {
-        if (!data) { $("#ace").html("<tr><td colspan='5'>Erreur</td></tr>"); return; }
-
+    /* ARC-EN-CIEL */
+    fetchStop(8591935, data => {
         let rows = "";
-        data.forEach(e => {
-            if (e.label !== "17") return;                              // Only line 17
-            if (!e.destinationName.toLowerCase().includes("lausanne, vigie")) return; // Must contain Lausanne, Vigie
-            rows += formatEntry(e);
-        });
+        if (data) {
+            data.forEach(e => {
+                const line = (e.label || "").trim();
+                const dest = (e.destinationName || "").toLowerCase();
 
-        if (rows === "") rows = "<tr><td colspan='5'>Aucun départ</td></tr>";
-        $("#ace").html(rows);
+                if (line !== "17") return;
+                if (!dest.includes("vigie")) return;
+
+                rows += formatEntry(e);
+            });
+        }
+        $("#ace").html(rows || "<tr><td colspan='5'>Aucun départ</td></tr>");
     });
 
-
-    /* ---------------- ZINGUERIE (36 / 54 / 58 → Renens*) ---------------- */
-    fetchStop(8591939, function(data) {
-        if (!data) { $("#zing").html("<tr><td colspan='5'>Erreur</td></tr>"); return; }
-
+    /* ZINGUERIE */
+    fetchStop(8591939, data => {
         let rows = "";
-        data.forEach(e => {
-            if (!["36","54","58"].includes(e.label)) return;            // Only lines 36,54,58
-            if (!e.destinationName.toLowerCase().includes("renens")) return; // Destination contains Renens
-            rows += formatEntry(e);
-        });
+        if (data) {
+            data.forEach(e => {
+                const line = (e.label || "").trim();
+                const dest = (e.destinationName || "").toLowerCase();
 
-        if (rows === "") rows = "<tr><td colspan='5'>Aucun départ</td></tr>";
-        $("#zing").html(rows);
+                if (!["36", "54", "58"].includes(line)) return;
+                if (!dest.includes("renens")) return;
+
+                rows += formatEntry(e);
+            });
+        }
+        $("#zing").html(rows || "<tr><td colspan='5'>Aucun départ</td></tr>");
     });
-
 }
 
-// Initial load + refresh every 60s
 loadAll();
 setInterval(loadAll, 60000);
 
