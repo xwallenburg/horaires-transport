@@ -82,6 +82,11 @@
 
 <script>
 
+function parseDate(dateStr) {
+    if (!dateStr || dateStr === "nodata") return null;
+    return moment(dateStr, "DD.MM.YYYY HH:mm");
+}
+
 function fetchStop(stopId, callback) {
     $.getJSON(
         "https://api3.geo.admin.ch/stationboard/stops/" + stopId + "?_=" + Date.now(),
@@ -90,19 +95,22 @@ function fetchStop(stopId, callback) {
 }
 
 function formatEntry(entry) {
-    const now = moment(entry.currentDate);
-    const scheduled = moment(entry.departureDate);
-    const estimated = entry.estimatedDate !== "nodata" ? moment(entry.estimatedDate) : null;
+    const now = moment();
+
+    const scheduled = parseDate(entry.departureDate);
+    const estimated = parseDate(entry.estimatedDate);
     const finalTime = estimated || scheduled;
 
+    if (!finalTime || !finalTime.isValid()) return "";
+
     let delay = "";
-    if (estimated) {
+    if (estimated && scheduled) {
         const late = estimated.diff(scheduled, "minutes");
         if (late > 0) delay = "(+" + late + "′)";
     }
 
+    const diff = Math.max(0, Math.floor(finalTime.diff(now, "minutes"))) + "′";
     const line = (entry.label || "").trim();
-    const diff = Math.floor(finalTime.diff(now, "minutes")) + "′";
 
     return `
         <tr>
@@ -142,7 +150,7 @@ function loadAll() {
                 const line = (e.label || "").trim();
                 const dest = (e.destinationName || "").toLowerCase();
 
-                if (!["36", "54", "58"].includes(line)) return;
+                if (!["36","54","58"].includes(line)) return;
                 if (!dest.includes("renens")) return;
 
                 rows += formatEntry(e);
